@@ -46,10 +46,6 @@ public class NodeJSIDE extends JFrame {
         setLocationRelativeTo(null); // Center the window on screen
 
 
-        // Set working directory to user home initially
-        workingDirectory = new File(System.getProperty("user.home"));
-
-
         // Initialize open files map
         openFiles = new HashMap<>();
 
@@ -58,7 +54,15 @@ public class NodeJSIDE extends JFrame {
         initTerminalStyles();
 
 
-        // Initialize Components
+        // IMPORTANT: Ask user to select directory BEFORE initializing components
+        if (!selectWorkingDirectory()) {
+            // If user cancels directory selection, exit the application
+            System.exit(0);
+            return;
+        }
+
+
+        // Initialize Components AFTER directory is selected
         initComponents();
 
 
@@ -66,6 +70,30 @@ public class NodeJSIDE extends JFrame {
         createMenuBar();
         // Make the window visible
         setVisible(true);
+    }
+
+
+    // Prompt user to select working directory at startup - returns false if user cancels
+    private boolean selectWorkingDirectory() {
+        JFileChooser chooser = new JFileChooser(System.getProperty("user.home"));
+        chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+        chooser.setDialogTitle("Select Project Directory to Work With");
+        chooser.setApproveButtonText("Select Directory");
+        
+        // Show dialog BEFORE window is visible
+        int result = chooser.showOpenDialog(null);
+        
+        if (result == JFileChooser.APPROVE_OPTION) {
+            workingDirectory = chooser.getSelectedFile();
+            return true;
+        }
+        
+        // User cancelled - show message and return false
+        JOptionPane.showMessageDialog(null, 
+            "No directory selected. Application will exit.", 
+            "No Directory", 
+            JOptionPane.WARNING_MESSAGE);
+        return false;
     }
 
 
@@ -104,10 +132,13 @@ public class NodeJSIDE extends JFrame {
         leftPanel.setBorder(BorderFactory.createTitledBorder("File Explorer"));
         centerPanel.setBorder(BorderFactory.createTitledBorder("Editor"));
         rightPanel.setBorder(BorderFactory.createTitledBorder("Terminal"));
-        // Build the left panel(File Explorer)
-        setupFileExplorer();
-        setupEditor();
+        
+        // CRITICAL FIX: Setup terminal FIRST before file explorer
+        // This ensures terminalDoc is initialized before refreshFileTree() is called
         setupTerminal();
+        setupEditor();
+        setupFileExplorer(); // Now this can safely call refreshFileTree() which uses terminal
+        
         // using Split panes to divide the space
         JSplitPane mainSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftPanel, centerPanel);
         mainSplit.setDividerLocation(300); // Set initial divider position
@@ -321,7 +352,7 @@ public class NodeJSIDE extends JFrame {
         JMenu fileMenu = new JMenu("File");
         JMenuItem newFileItem = new JMenuItem("New File");
         JMenuItem newFolderItem = new JMenuItem("New Folder");
-        JMenuItem openDirItem = new JMenuItem("Open Directory");
+        JMenuItem changeDirItem = new JMenuItem("Change Working Directory");
         JMenuItem saveItem = new JMenuItem("Save");
         JMenuItem exitItem = new JMenuItem("Exit");
 
@@ -329,7 +360,7 @@ public class NodeJSIDE extends JFrame {
         // Adding action listeners for file operations
         newFileItem.addActionListener(e -> createNewFile());
         newFolderItem.addActionListener(e -> createNewFolder());
-        openDirItem.addActionListener(e -> changeWorkingDirectory());
+        changeDirItem.addActionListener(e -> changeWorkingDirectory());
         saveItem.addActionListener(e -> saveCurrentFile());
         exitItem.addActionListener(e -> System.exit(0));
 
@@ -338,7 +369,7 @@ public class NodeJSIDE extends JFrame {
         fileMenu.add(newFileItem);
         fileMenu.add(newFolderItem);
         fileMenu.addSeparator(); // Adds a separator line
-        fileMenu.add(openDirItem);
+        fileMenu.add(changeDirItem);
         fileMenu.add(saveItem);
         fileMenu.addSeparator();
         fileMenu.add(exitItem);
@@ -399,21 +430,22 @@ public class NodeJSIDE extends JFrame {
     }
 
 
-    // Change working directory - this is the key fix for your issue
+    // Change working directory - allows user to switch to a different project
     private void changeWorkingDirectory() {
         JFileChooser chooser = new JFileChooser(workingDirectory);
         chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-        chooser.setDialogTitle("Select Working Directory");
+        chooser.setDialogTitle("Select New Working Directory");
         
         if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+            // Close all open files first
+            editorTabs.removeAll();
+            openFiles.clear();
+            addWelcomeTab();
+            
             // Update working directory
             workingDirectory = chooser.getSelectedFile();
             
-            // Completely rebuild the tree with the new directory as the absolute root
-            rootNode.removeAllChildren();
-            rootNode.setUserObject(new FileNode(workingDirectory.getName(), workingDirectory, true));
-            
-            // Reload the tree
+            // Rebuild the tree with the new directory
             refreshFileTree();
             
             appendToTerminal("\n[Working directory changed to: " + workingDirectory.getAbsolutePath() + "]\n\n", successStyle);
@@ -467,11 +499,10 @@ public class NodeJSIDE extends JFrame {
 
     // Setup file explorer with tree view and buttons - shows only filenames
     private void setupFileExplorer() {
-        // Remove the previous simple setup
         leftPanel.setLayout(new BorderLayout());
 
 
-        // Create the root node for our file tree - starts with working directory name only
+        // Create the root node for our file tree - uses selected working directory
         rootNode = new DefaultMutableTreeNode(new FileNode(workingDirectory.getName(), workingDirectory, true));
 
 
@@ -557,7 +588,7 @@ public class NodeJSIDE extends JFrame {
         leftPanel.add(scrollPane, BorderLayout.CENTER);
 
 
-        // Load the actual files from disk
+        // Load the actual files from disk - ONLY from selected working directory
         refreshFileTree();
     }
 
@@ -623,6 +654,8 @@ public class NodeJSIDE extends JFrame {
     private void addWelcomeTab() {
         JTextArea welcomeEditor = new JTextArea();
         welcomeEditor.setText("Welcome to Node.js IDE!\n\n" +
+                "Working Directory: " + workingDirectory.getAbsolutePath() + "\n\n" +
+                "Quick Guide:\n" +
                 "• Double-click files in the explorer to open them\n" +
                 "• Use Run button to execute current JavaScript file\n" +
                 "• Use terminal to run Node.js and npm commands\n" +
@@ -631,7 +664,8 @@ public class NodeJSIDE extends JFrame {
                 "• Change working directory from File menu\n" +
                 "• Create new files and folders with File menu\n" +
                 "• Save files with Save button or Ctrl+S\n" +
-                "• Refresh file tree to see external changes");
+                "• Refresh file tree to see external changes\n\n" +
+                "Note: Only the selected project directory is loaded for better performance!");
         welcomeEditor.setFont(new Font("Consolas", Font.PLAIN, 14));
         welcomeEditor.setEditable(false);
         welcomeEditor.setBackground(new Color(30, 30, 30));
@@ -643,19 +677,23 @@ public class NodeJSIDE extends JFrame {
     }
 
 
-    // Refresh file tree - reloads directory structure from the working directory only
+    // Refresh file tree - reloads ONLY the selected working directory
     private void refreshFileTree() {
-        // Clear existing child nodes (but keep the root as is)
+        // Clear existing child nodes
         rootNode.removeAllChildren();
 
 
-        // Ensure root represents the current working directory
+        // Set root to current working directory
         rootNode.setUserObject(new FileNode(workingDirectory.getName(), workingDirectory, true));
+
+
+        // Show loading message
+        appendToTerminal("[Loading directory structure...]\n", normalStyle);
 
 
         // Load files in background thread so GUI stays responsive
         new Thread(() -> {
-            // Load only the contents of the working directory, not parent directories
+            // Load ONLY the contents of the selected working directory
             loadDirectory(workingDirectory, rootNode);
 
 
@@ -663,12 +701,13 @@ public class NodeJSIDE extends JFrame {
             SwingUtilities.invokeLater(() -> {
                 treeModel.reload();
                 fileTree.expandRow(0); // Expand root node by default
+                appendToTerminal("[Directory loaded successfully]\n", successStyle);
             });
         }).start();
     }
 
 
-    // Recursively load directory contents into tree nodes - only subdirectories of working directory
+    // Recursively load directory contents - ONLY within the selected working directory
     private void loadDirectory(File dir, DefaultMutableTreeNode node) {
         File[] files = dir.listFiles();
         if (files != null) {
@@ -680,14 +719,13 @@ public class NodeJSIDE extends JFrame {
             });
             
             for (File file : files) {
-                // Only show normal files (not hidden ones that start with dot)
-                // Also skip node_modules for cleaner view
+                // Skip hidden files and node_modules for better performance and cleaner view
                 if (!file.getName().startsWith(".") && !file.getName().equals("node_modules")) {
                     // Create node for this file/folder using FileNode wrapper
                     FileNode fileNode = new FileNode(file.getName(), file, file.isDirectory());
                     DefaultMutableTreeNode childNode = new DefaultMutableTreeNode(fileNode);
                     node.add(childNode);
-                    // If its a directory load its contents too (recursive)
+                    // If its a directory, load its contents too (recursive)
                     if (file.isDirectory()) {
                         loadDirectory(file, childNode);
                     }
@@ -907,7 +945,7 @@ public class NodeJSIDE extends JFrame {
             e.printStackTrace();
         }
         
-        // Create our window - starts the application
+        // Create our window - starts the application with directory selection
         SwingUtilities.invokeLater(() -> {
             new NodeJSIDE();
         });
