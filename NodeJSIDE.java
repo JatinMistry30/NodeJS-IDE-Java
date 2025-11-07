@@ -28,9 +28,9 @@ public class NodeJSIDE extends JFrame {
     // Track opened files
     private Map<String, EditorTab> openFiles;
 
-    // Track the current running process
-    private Process currenProcess;
-    private SimpleAttributeSet normalStyle, errorStyle, successStyle, commandStyle; // Terminal styles
+    // Process management and terminal styles
+    private Process currentProcess;
+    private SimpleAttributeSet normalStyle, errorStyle, successStyle, commandStyle;
 
     // Constructor - this runs when we create the window
     public NodeJSIDE() {
@@ -45,7 +45,7 @@ public class NodeJSIDE extends JFrame {
         // Initialize open files map
         openFiles = new HashMap<>();
 
-        // Initalize terminal styles
+        // Initialize terminal styles
         initTerminalStyles();
 
         // Initialize Components
@@ -57,18 +57,19 @@ public class NodeJSIDE extends JFrame {
         setVisible(true);
     }
 
+    // Initialize terminal text styles for colored output
     private void initTerminalStyles() {
         normalStyle = new SimpleAttributeSet();
         StyleConstants.setForeground(normalStyle, new Color(200, 200, 200));
-
+        
         errorStyle = new SimpleAttributeSet();
         StyleConstants.setForeground(errorStyle, new Color(255, 100, 100));
         StyleConstants.setBold(errorStyle, true);
-
+        
         successStyle = new SimpleAttributeSet();
         StyleConstants.setForeground(successStyle, new Color(100, 255, 100));
         StyleConstants.setBold(successStyle, true);
-
+        
         commandStyle = new SimpleAttributeSet();
         StyleConstants.setForeground(commandStyle, new Color(100, 200, 255));
         StyleConstants.setBold(commandStyle, true);
@@ -105,7 +106,7 @@ public class NodeJSIDE extends JFrame {
         add(mainPanel);
     }
 
-    // Setup the terminal
+    // Setup the terminal with command execution capabilities
     private void setupTerminal() {
         rightPanel.setLayout(new BorderLayout());
 
@@ -122,6 +123,7 @@ public class NodeJSIDE extends JFrame {
 
         // Put terminal in scroll pane
         JScrollPane terminalScroll = new JScrollPane(terminalArea);
+        
         // Create command input area at the bottom
         JPanel commandPanel = new JPanel(new BorderLayout(5, 5));
         JLabel promptLabel = new JLabel("$");
@@ -137,61 +139,140 @@ public class NodeJSIDE extends JFrame {
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
         JButton executeBtn = new JButton("Execute");
         JButton clearBtn = new JButton("Clear");
+        JButton stopBtn = new JButton("Stop Process");
 
         // Execute button action - runs commands in terminal
-        executeBtn.addActionListener(e -> {
-            String command = commandField.getText();
-            if (!command.isEmpty()) {
-                appendToTerminal("$ " + command + "\n", Color.CYAN);
-                appendToTerminal("Command executed: " + command + "\n", Color.WHITE);
-                commandField.setText(""); // Clear the input field
-            }
-        });
-
+        executeBtn.addActionListener(e -> executeCommand());
         // Clear button action - clears terminal output
         clearBtn.addActionListener(e -> clearTerminal());
+        // Stop button - stops currently running process
+        stopBtn.addActionListener(e -> stopProcess());
 
         buttonPanel.add(executeBtn);
         buttonPanel.add(clearBtn);
+        buttonPanel.add(stopBtn);
 
         // For Enter Key - allows executing commands by pressing Enter
-        commandField.addActionListener(e -> {
-            String command = commandField.getText();
-            if (!command.isEmpty()) {
-                appendToTerminal("$ " + command + "\n", Color.CYAN);
-                appendToTerminal("Command executed: " + command + "\n", Color.WHITE);
-                commandField.setText("");
-            }
-        });
+        commandField.addActionListener(e -> executeCommand());
 
         // Add everything to command panel
         commandPanel.add(promptLabel, BorderLayout.WEST);
         commandPanel.add(commandField, BorderLayout.CENTER);
         commandPanel.add(buttonPanel, BorderLayout.EAST);
 
+        // Quick command buttons for common Node.js commands
+        JPanel quickCommandPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
+        String[] quickCommands = {"node --version", "npm --version", "npm init -y", "npm install"};
+
+        for (String cmd : quickCommands) {
+            JButton quickBtn = new JButton(cmd);
+            quickBtn.addActionListener(e -> executeQuickCommand(cmd));
+            quickCommandPanel.add(quickBtn);
+        }
+
+        // Create top panel for terminal title and quick commands
+        JPanel terminalTopPanel = new JPanel(new BorderLayout());
+        terminalTopPanel.add(new JLabel("Terminal"), BorderLayout.WEST);
+        terminalTopPanel.add(quickCommandPanel, BorderLayout.CENTER);
+
         // Add welcome message to terminal
-        appendToTerminal("=== Node.js Terminal ===\n", Color.GREEN);
-        appendToTerminal("Type Node.js commands below\n\n", Color.WHITE);
+        appendToTerminal("=== Node.js Terminal ===\n", successStyle);
+        appendToTerminal("Working directory: " + workingDirectory.getAbsolutePath() + "\n", normalStyle);
+        appendToTerminal("Type Node.js commands below or use quick buttons\n\n", normalStyle);
 
         // Add everything to right panel
+        rightPanel.add(terminalTopPanel, BorderLayout.NORTH);
         rightPanel.add(terminalScroll, BorderLayout.CENTER);
         rightPanel.add(commandPanel, BorderLayout.SOUTH);
     }
 
-    // Helper method to add colored text to terminal
-    private void appendToTerminal(String text, Color color) {
+    // Helper method to add styled text to terminal
+    private void appendToTerminal(String text, SimpleAttributeSet style) {
         try {
-            // Create a style for the color
-            SimpleAttributeSet style = new SimpleAttributeSet();
-            StyleConstants.setForeground(style, color);
-
-            // Add the text with the style
             terminalDoc.insertString(terminalDoc.getLength(), text, style);
-
-            // Scroll to bottom to show latest output
             terminalArea.setCaretPosition(terminalDoc.getLength());
-        } catch (Exception e) {
+        } catch (BadLocationException e) {
             e.printStackTrace();
+        }
+    }
+
+    // Overloaded method for backward compatibility with color parameter
+    private void appendToTerminal(String text, Color color) {
+        SimpleAttributeSet style = new SimpleAttributeSet();
+        StyleConstants.setForeground(style, color);
+        appendToTerminal(text, style);
+    }
+
+    // Execute command from terminal input
+    private void executeCommand() {
+        String command = commandField.getText().trim();
+        if (command.isEmpty()) return;
+        
+        appendToTerminal("\n$ " + command + "\n", commandStyle);
+        commandField.setText(""); // Clear input field
+        
+        // Execute command in background thread to keep GUI responsive
+        new Thread(() -> {
+            try {
+                ProcessBuilder pb = new ProcessBuilder();
+                String os = System.getProperty("os.name").toLowerCase();
+                
+                // Set command based on operating system
+                if (os.contains("win")) {
+                    pb.command("cmd.exe", "/c", command);
+                } else {
+                    pb.command("sh", "-c", command);
+                }
+                
+                pb.directory(workingDirectory); // Set working directory
+                pb.redirectErrorStream(true); // Combine stdout and stderr
+                
+                currentProcess = pb.start();
+                
+                // Read command output line by line
+                BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(currentProcess.getInputStream())
+                );
+                
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    final String output = line + "\n";
+                    SwingUtilities.invokeLater(() -> appendToTerminal(output, normalStyle));
+                }
+                
+                // Wait for process to complete and get exit code
+                int exitCode = currentProcess.waitFor();
+                
+                // Show completion message based on exit code
+                SwingUtilities.invokeLater(() -> {
+                    if (exitCode == 0) {
+                        appendToTerminal("[✓ Process completed]\n", successStyle);
+                    } else {
+                        appendToTerminal("[✗ Process exited with code: " + exitCode + "]\n", errorStyle);
+                    }
+                });
+                
+            } catch (Exception e) {
+                SwingUtilities.invokeLater(() -> 
+                    appendToTerminal("[Error: " + e.getMessage() + "]\n", errorStyle)
+                );
+            }
+        }).start();
+    }
+
+    // Execute quick commands from buttons
+    private void executeQuickCommand(String command) {
+        commandField.setText(command);
+        executeCommand();
+    }
+
+    // Stop currently running process
+    private void stopProcess() {
+        if (currentProcess != null && currentProcess.isAlive()) {
+            currentProcess.destroyForcibly();
+            appendToTerminal("\n[Process stopped by user]\n", errorStyle);
+        } else {
+            appendToTerminal("[No process running]\n", errorStyle);
         }
     }
 
@@ -209,12 +290,8 @@ public class NodeJSIDE extends JFrame {
 
         // Adding action listeners for file operations
         newFileItem.addActionListener(e -> createNewFile());
-        newFolderItem.addActionListener(e -> {
-            appendToTerminal("New Folder menu clicked\n", Color.YELLOW);
-        });
-        openDirItem.addActionListener(e -> {
-            appendToTerminal("Open Directory menu clicked\n", Color.YELLOW);
-        });
+        newFolderItem.addActionListener(e -> createNewFolder());
+        openDirItem.addActionListener(e -> changeWorkingDirectory());
         saveItem.addActionListener(e -> saveCurrentFile());
         exitItem.addActionListener(e -> System.exit(0));
 
@@ -235,9 +312,7 @@ public class NodeJSIDE extends JFrame {
 
         // Edit menu actions
         deleteItem.addActionListener(e -> deleteSelectedFile());
-        renameItem.addActionListener(e -> {
-            appendToTerminal("Rename menu clicked\n", Color.YELLOW);
-        });
+        renameItem.addActionListener(e -> renameSelectedFile());
         refreshItem.addActionListener(e -> refreshFileTree());
 
         editMenu.add(deleteItem);
@@ -251,9 +326,7 @@ public class NodeJSIDE extends JFrame {
         JMenuItem runFileItem = new JMenuItem("Run Current File");
 
         clearTerminalItem.addActionListener(e -> clearTerminal());
-        runFileItem.addActionListener(e -> {
-            appendToTerminal("Run Current File menu clicked\n", Color.YELLOW);
-        });
+        runFileItem.addActionListener(e -> runCurrentFile());
 
         terminalMenu.add(clearTerminalItem);
         terminalMenu.add(runFileItem);
@@ -271,19 +344,74 @@ public class NodeJSIDE extends JFrame {
     private void clearTerminal() {
         try {
             terminalDoc.remove(0, terminalDoc.getLength());
-            appendToTerminal("Terminal cleared\n", Color.GREEN);
+            appendToTerminal("Terminal cleared\n", successStyle);
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    // Setup file explorer with tree view and buttons
+    // Change working directory
+    private void changeWorkingDirectory() {
+        JFileChooser chooser = new JFileChooser(workingDirectory);
+        chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+        chooser.setDialogTitle("Select Working Directory");
+        
+        if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+            workingDirectory = chooser.getSelectedFile();
+            refreshFileTree();
+            appendToTerminal("\n[Working directory changed to: " + workingDirectory.getAbsolutePath() + "]\n\n", successStyle);
+        }
+    }
+
+    // Create new folder
+    private void createNewFolder() {
+        String folderName = JOptionPane.showInputDialog(this, "Enter folder name:");
+        if (folderName != null && !folderName.trim().isEmpty()) {
+            File newFolder = new File(workingDirectory, folderName.trim());
+            if (newFolder.mkdir()) {
+                refreshFileTree();
+                appendToTerminal("[Created folder: " + folderName + "]\n", successStyle);
+            } else {
+                appendToTerminal("[Error creating folder]\n", errorStyle);
+            }
+        }
+    }
+
+    // Rename selected file
+    private void renameSelectedFile() {
+        TreePath path = fileTree.getSelectionPath();
+        if (path == null) {
+            appendToTerminal("[No file selected]\n", errorStyle);
+            return;
+        }
+        
+        DefaultMutableTreeNode node = (DefaultMutableTreeNode) path.getLastPathComponent();
+        Object userObject = node.getUserObject();
+        
+        if (userObject instanceof FileNode) {
+            FileNode fileNode = (FileNode) userObject;
+            File file = fileNode.getFile();
+            String newName = JOptionPane.showInputDialog(this, "New name:", file.getName());
+            
+            if (newName != null && !newName.trim().isEmpty()) {
+                File newFile = new File(file.getParent(), newName.trim());
+                if (file.renameTo(newFile)) {
+                    refreshFileTree();
+                    appendToTerminal("[Renamed to: " + newName + "]\n", successStyle);
+                } else {
+                    appendToTerminal("[Error renaming file]\n", errorStyle);
+                }
+            }
+        }
+    }
+
+    // Setup file explorer with tree view and buttons - shows only filenames
     private void setupFileExplorer() {
         // Remove the previous simple setup
         leftPanel.setLayout(new BorderLayout());
 
         // Create the root node for our file tree
-        rootNode = new DefaultMutableTreeNode(workingDirectory.getName());
+        rootNode = new DefaultMutableTreeNode(new FileNode(workingDirectory.getName(), workingDirectory, true));
 
         // Create tree model to manage the tree structure
         treeModel = new DefaultTreeModel(rootNode);
@@ -293,6 +421,32 @@ public class NodeJSIDE extends JFrame {
         fileTree.setRootVisible(true);
         fileTree.setShowsRootHandles(true);
 
+        // Custom tree cell renderer to show only filenames
+        fileTree.setCellRenderer(new DefaultTreeCellRenderer() {
+            @Override
+            public Component getTreeCellRendererComponent(JTree tree, Object value, boolean sel, boolean expanded, boolean leaf, int row, boolean hasFocus) {
+                super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row, hasFocus);
+                
+                if (value instanceof DefaultMutableTreeNode) {
+                    DefaultMutableTreeNode node = (DefaultMutableTreeNode) value;
+                    Object userObject = node.getUserObject();
+                    
+                    if (userObject instanceof FileNode) {
+                        FileNode fileNode = (FileNode) userObject;
+                        setText(fileNode.getName()); // Show only filename
+                        
+                        // Set appropriate icons
+                        if (fileNode.isDirectory()) {
+                            setIcon(expanded ? UIManager.getIcon("Tree.openIcon") : UIManager.getIcon("Tree.closedIcon"));
+                        } else {
+                            setIcon(UIManager.getIcon("Tree.leafIcon"));
+                        }
+                    }
+                }
+                return this;
+            }
+        });
+
         // Double Click to open files - main file interaction
         fileTree.addMouseListener(new MouseAdapter() {
             public void mouseClicked(MouseEvent e) {
@@ -301,10 +455,10 @@ public class NodeJSIDE extends JFrame {
                     if (path != null) {
                         DefaultMutableTreeNode node = (DefaultMutableTreeNode) path.getLastPathComponent();
                         Object userObject = node.getUserObject(); // Get the associated File object
-                        if (userObject instanceof File) {
-                            File file = (File) userObject;
-                            if (file.isFile()) { // Only open files, not folders
-                                openFile(file);
+                        if (userObject instanceof FileNode) {
+                            FileNode fileNode = (FileNode) userObject;
+                            if (!fileNode.isDirectory()) { // Only open files, not folders
+                                openFile(fileNode.getFile());
                             }
                         }
                     }
@@ -346,9 +500,7 @@ public class NodeJSIDE extends JFrame {
         JButton closeBtn = new JButton("Close Tab");
 
         // Action Listeners for editor buttons
-        runBtn.addActionListener(e -> {
-            appendToTerminal("Run button clicked - we'll implement this later\n", Color.YELLOW);
-        });
+        runBtn.addActionListener(e -> runCurrentFile());
         saveBtn.addActionListener(e -> saveCurrentFile());
         closeBtn.addActionListener(e -> closeCurrentTab());
 
@@ -368,16 +520,40 @@ public class NodeJSIDE extends JFrame {
         centerPanel.add(editorTabs, BorderLayout.CENTER);
     }
 
+    // Run current JavaScript file with Node.js
+    private void runCurrentFile() {
+        int index = editorTabs.getSelectedIndex();
+        if (index == -1) {
+            appendToTerminal("[No file open to run]\n", errorStyle);
+            return;
+        }
+        
+        JScrollPane scrollPane = (JScrollPane) editorTabs.getComponentAt(index);
+        
+        // Find the current file and run it
+        for (EditorTab tab : openFiles.values()) {
+            if (tab.scrollPane == scrollPane) {
+                saveFile(tab); // Save file before running
+                executeQuickCommand("node " + tab.file.getName());
+                break;
+            }
+        }
+    }
+
     // Add welcome tab with user instructions
     private void addWelcomeTab() {
         JTextArea welcomeEditor = new JTextArea();
         welcomeEditor.setText("Welcome to Node.js IDE!\n\n" +
                 "• Double-click files in the explorer to open them\n" +
-                "• Use the toolbar to run and save files\n" +
-                "• Multiple files open in tabs\n" +
-                "• Use the terminal to run Node.js commands");
+                "• Use Run button to execute current JavaScript file\n" +
+                "• Use terminal to run Node.js and npm commands\n" +
+                "• Quick commands: node --version, npm --version, etc.\n" +
+                "• Stop running processes with Stop Process button\n" +
+                "• Change working directory from File menu\n" +
+                "• Create new files and folders with File menu\n" +
+                "• Save files with Save button or Ctrl+S");
         welcomeEditor.setFont(new Font("Consolas", Font.PLAIN, 14));
-        welcomeEditor.setEditable(false); // Read-only welcome message
+        welcomeEditor.setEditable(false);
         welcomeEditor.setBackground(new Color(30, 30, 30));
         welcomeEditor.setForeground(new Color(200, 200, 200));
 
@@ -391,7 +567,7 @@ public class NodeJSIDE extends JFrame {
         rootNode.removeAllChildren();
 
         // set the root name to current directory
-        rootNode.setUserObject(workingDirectory.getName());
+        rootNode.setUserObject(new FileNode(workingDirectory.getName(), workingDirectory, true));
 
         // Load files in background thread so GUI appears immediately
         new Thread(() -> {
@@ -411,10 +587,10 @@ public class NodeJSIDE extends JFrame {
         if (files != null) {
             for (File file : files) {
                 // Only show normal files (not hidden ones that start with dot)
-                if (!file.getName().startsWith(".")) {
-                    // Create node for this file/folder
-                    DefaultMutableTreeNode childNode = new DefaultMutableTreeNode(file.getName());
-                    childNode.setUserObject(file); // Store File object for later access
+                if (!file.getName().startsWith(".") && !file.getName().equals("node_modules")) {
+                    // Create node for this file/folder using FileNode wrapper
+                    FileNode fileNode = new FileNode(file.getName(), file, file.isDirectory());
+                    DefaultMutableTreeNode childNode = new DefaultMutableTreeNode(fileNode);
                     node.add(childNode);
                     // If its a directory load its contents too (recursive)
                     if (file.isDirectory()) {
@@ -429,7 +605,7 @@ public class NodeJSIDE extends JFrame {
     private void openFile(File file) {
         try {
             String filePath = file.getAbsolutePath();
-
+            
             // Check if file is already open to avoid duplicates
             if (openFiles.containsKey(filePath)) {
                 // Switch to existing tab instead of opening new one
@@ -437,7 +613,7 @@ public class NodeJSIDE extends JFrame {
                 editorTabs.setSelectedComponent(tab.scrollPane);
                 return;
             }
-
+            
             // Read the file content from disk
             String content = Files.readString(file.toPath());
 
@@ -461,10 +637,10 @@ public class NodeJSIDE extends JFrame {
             editorTabs.setSelectedComponent(scrollPane);
 
             // Show success message in terminal
-            appendToTerminal("[Opened: " + file.getName() + "]\n", Color.GREEN);
-
+            appendToTerminal("[Opened: " + file.getName() + "]\n", successStyle);
+            
         } catch (IOException e) {
-            appendToTerminal("[Error opening file: " + e.getMessage() + "]\n", Color.RED);
+            appendToTerminal("[Error opening file: " + e.getMessage() + "]\n", errorStyle);
         }
     }
 
@@ -477,12 +653,12 @@ public class NodeJSIDE extends JFrame {
                 if (newFile.createNewFile()) {
                     refreshFileTree(); // Update file explorer
                     openFile(newFile); // Open the new file
-                    appendToTerminal("[Created: " + fileName + "]\n", Color.GREEN);
+                    appendToTerminal("[Created: " + fileName + "]\n", successStyle);
                 } else {
-                    appendToTerminal("[File already exists]\n", Color.RED);
+                    appendToTerminal("[File already exists]\n", errorStyle);
                 }
             } catch (IOException e) {
-                appendToTerminal("[Error creating file: " + e.getMessage() + "]\n", Color.RED);
+                appendToTerminal("[Error creating file: " + e.getMessage() + "]\n", errorStyle);
             }
         }
     }
@@ -491,12 +667,12 @@ public class NodeJSIDE extends JFrame {
     private void saveCurrentFile() {
         int index = editorTabs.getSelectedIndex();
         if (index == -1) {
-            appendToTerminal("[No file open to save]\n", Color.RED);
+            appendToTerminal("[No file open to save]\n", errorStyle);
             return;
         }
-
+        
         JScrollPane scrollPane = (JScrollPane) editorTabs.getComponentAt(index);
-
+        
         // Find the tab in our openFiles map
         for (EditorTab tab : openFiles.values()) {
             if (tab.scrollPane == scrollPane) {
@@ -510,9 +686,9 @@ public class NodeJSIDE extends JFrame {
     private void saveFile(EditorTab tab) {
         try {
             Files.writeString(tab.file.toPath(), tab.editor.getText());
-            appendToTerminal("[Saved: " + tab.file.getName() + "]\n", Color.GREEN);
+            appendToTerminal("[Saved: " + tab.file.getName() + "]\n", successStyle);
         } catch (IOException e) {
-            appendToTerminal("[Error saving: " + e.getMessage() + "]\n", Color.RED);
+            appendToTerminal("[Error saving: " + e.getMessage() + "]\n", errorStyle);
         }
     }
 
@@ -520,19 +696,20 @@ public class NodeJSIDE extends JFrame {
     private void deleteSelectedFile() {
         TreePath path = fileTree.getSelectionPath();
         if (path == null) {
-            appendToTerminal("[No file selected]\n", Color.RED);
+            appendToTerminal("[No file selected]\n", errorStyle);
             return;
         }
-
+        
         DefaultMutableTreeNode node = (DefaultMutableTreeNode) path.getLastPathComponent();
         Object userObject = node.getUserObject();
-
-        if (userObject instanceof File) {
-            File file = (File) userObject;
+        
+        if (userObject instanceof FileNode) {
+            FileNode fileNode = (FileNode) userObject;
+            File file = fileNode.getFile();
             // Confirm deletion with user
-            int confirm = JOptionPane.showConfirmDialog(this,
-                    "Delete " + file.getName() + "?", "Confirm Delete", JOptionPane.YES_NO_OPTION);
-
+            int confirm = JOptionPane.showConfirmDialog(this, 
+                "Delete " + file.getName() + "?", "Confirm Delete", JOptionPane.YES_NO_OPTION);
+            
             if (confirm == JOptionPane.YES_OPTION) {
                 if (file.delete()) {
                     // Remove from open files if it's currently open
@@ -541,9 +718,9 @@ public class NodeJSIDE extends JFrame {
                         openFiles.remove(filePath);
                     }
                     refreshFileTree(); // Update the file explorer
-                    appendToTerminal("[Deleted: " + file.getName() + "]\n", Color.GREEN);
+                    appendToTerminal("[Deleted: " + file.getName() + "]\n", successStyle);
                 } else {
-                    appendToTerminal("[Error deleting file]\n", Color.RED);
+                    appendToTerminal("[Error deleting file]\n", errorStyle);
                 }
             }
         }
@@ -555,7 +732,7 @@ public class NodeJSIDE extends JFrame {
         if (selectedIndex != -1) {
             JScrollPane scrollPane = (JScrollPane) editorTabs.getComponentAt(selectedIndex);
             String tabTitle = editorTabs.getTitleAt(selectedIndex);
-
+            
             // Remove from openFiles map to free memory
             for (Map.Entry<String, EditorTab> entry : openFiles.entrySet()) {
                 if (entry.getValue().scrollPane == scrollPane) {
@@ -563,9 +740,39 @@ public class NodeJSIDE extends JFrame {
                     break;
                 }
             }
-
+            
             editorTabs.remove(selectedIndex);
             appendToTerminal("[Closed tab: " + tabTitle + "]\n", Color.YELLOW);
+        }
+    }
+
+    // Helper class to store file information while displaying only the name
+    class FileNode {
+        private String name;
+        private File file;
+        private boolean isDirectory;
+        
+        public FileNode(String name, File file, boolean isDirectory) {
+            this.name = name;
+            this.file = file;
+            this.isDirectory = isDirectory;
+        }
+        
+        public String getName() {
+            return name;
+        }
+        
+        public File getFile() {
+            return file;
+        }
+        
+        public boolean isDirectory() {
+            return isDirectory;
+        }
+        
+        @Override
+        public String toString() {
+            return name; // This ensures only the filename is displayed in the tree
         }
     }
 
@@ -574,7 +781,7 @@ public class NodeJSIDE extends JFrame {
         File file;
         JTextArea editor;
         JScrollPane scrollPane;
-
+        
         EditorTab(File file, JTextArea editor, JScrollPane scrollPane) {
             this.file = file;
             this.editor = editor;
@@ -584,7 +791,16 @@ public class NodeJSIDE extends JFrame {
 
     // Main method - program entry point
     public static void main(String[] args) {
+        // Set system look and feel for native appearance
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        
         // Create our window - starts the application
-        new NodeJSIDE();
+        SwingUtilities.invokeLater(() -> {
+            new NodeJSIDE();
+        });
     }
 }
