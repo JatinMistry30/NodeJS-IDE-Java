@@ -720,7 +720,7 @@ public class NodeJSIDE extends JFrame {
             
             for (File file : files) {
                 // Skip hidden files and node_modules for better performance and cleaner view
-                if (!file.getName().startsWith(".") && !file.getName().equals("node_modules")) {
+                if (!file.getName().startsWith(".")) {
                     // Create node for this file/folder using FileNode wrapper
                     FileNode fileNode = new FileNode(file.getName(), file, file.isDirectory());
                     DefaultMutableTreeNode childNode = new DefaultMutableTreeNode(fileNode);
