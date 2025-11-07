@@ -267,6 +267,25 @@ public class NodeJSIDE extends JFrame {
         fileTree.setRootVisible(true);
         fileTree.setShowsRootHandles(true);
 
+        // Double Click to open files
+        fileTree.addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    TreePath path = fileTree.getPathForLocation(e.getX(), e.getY());
+                    if (path != null) {
+                        DefaultMutableTreeNode node = (DefaultMutableTreeNode) path.getLastPathComponent();
+                        Object userObject = node.getUserObject();
+                        if (userObject instanceof File) {
+                            File file = (File) userObject;
+                            if (file.isFile()) {
+                                openFile(file);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
         // Put the tree in a scroll pane
         JScrollPane scrollPane = new JScrollPane(fileTree);
 
@@ -278,12 +297,27 @@ public class NodeJSIDE extends JFrame {
         buttonPanel.add(refreshBtn);
         buttonPanel.add(newFileBtn);
 
+        // Event for refresh button
+        refreshBtn.addActionListener(e -> refreshFileTree());
+        newFileBtn.addActionListener(e -> {
+            appendToTerminal("New File button clicked - we'll implement this later\n", Color.YELLOW);
+        });
         // Add everything to left panel
         leftPanel.add(buttonPanel, BorderLayout.NORTH);
         leftPanel.add(scrollPane, BorderLayout.CENTER);
 
         // Load the actual files
         refreshFileTree();
+    }
+
+    // Method to close current tab
+    private void closeCurrentTab() {
+        int selectedIndex = editorTabs.getSelectedIndex();
+        if (selectedIndex != -1) {
+            String tabTitle = editorTabs.getTitleAt(selectedIndex);
+            editorTabs.remove(selectedIndex);
+            appendToTerminal("[Closed tab: " + tabTitle + "]\n", Color.YELLOW);
+        }
     }
 
     // Setup the editor area with tabs
@@ -294,7 +328,15 @@ public class NodeJSIDE extends JFrame {
         JButton runBtn = new JButton("Run");
         JButton saveBtn = new JButton("Save");
         JButton closeBtn = new JButton("Close Tab");
+        // Action Listeners
+        closeBtn.addActionListener(e -> closeCurrentTab());
+        runBtn.addActionListener(e -> {
+            appendToTerminal("Run button clicked - we'll implement this later\n", Color.YELLOW);
+        });
 
+        saveBtn.addActionListener(e -> {
+            appendToTerminal("Save button clicked - we'll implement this later\n", Color.YELLOW);
+        });
         toolbar.add(runBtn);
         toolbar.add(saveBtn);
         toolbar.add(closeBtn);
@@ -358,6 +400,34 @@ public class NodeJSIDE extends JFrame {
                     }
                 }
             }
+        }
+    }
+
+    // To open a file in the editor
+    private void openFile(File file) {
+        try {
+            // Read the file content
+            String content = Files.readString(file.toPath());
+
+            // Create a text area for editing
+            JTextArea editor = new JTextArea(content);
+            editor.setFont(new Font("Consolas", Font.PLAIN, 14));
+            editor.setTabSize(2);
+            editor.setBackground(new Color(30, 30, 30));
+            editor.setForeground(new Color(200, 200, 200));
+            editor.setCaretColor(Color.WHITE);
+
+            // Put editor in scroll pane
+            JScrollPane scrollPane = new JScrollPane(editor);
+
+            // Add tab for this file
+            editorTabs.addTab(file.getName(), scrollPane);
+            editorTabs.setSelectedComponent(scrollPane);
+
+            // Show message in terminal
+            appendToTerminal("[Opened: " + file.getName() + "]\n", Color.GREEN);
+        } catch (IOException e) {
+            appendToTerminal("[Error opening file: " + e.getMessage() + "]\n", Color.RED);
         }
     }
 
