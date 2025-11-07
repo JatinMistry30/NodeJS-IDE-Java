@@ -37,6 +37,9 @@ public class NodeJSIDE extends JFrame {
 
         // Initialize Components
         initComponents();
+
+        // Create Menu bar
+        createMenuBar();
         // Make the window visible
         setVisible(true);
     }
@@ -105,8 +108,29 @@ public class NodeJSIDE extends JFrame {
         JButton executeBtn = new JButton("Execute");
         JButton clearBtn = new JButton("Clear");
 
+        executeBtn.addActionListener(e -> {
+            String command = commandField.getText();
+            if (!command.isEmpty()) {
+                appendToTerminal("$ " + command + "\n", Color.CYAN);
+                appendToTerminal("Command executed: " + command + "\n", Color.WHITE);
+                commandField.setText(""); // Clear the input field
+            }
+        });
+
+        clearBtn.addActionListener(e -> clearTerminal());
+
         buttonPanel.add(executeBtn);
         buttonPanel.add(clearBtn);
+
+        // For Enter Key
+        commandField.addActionListener(e -> {
+            String command = commandField.getText();
+            if (!command.isEmpty()) {
+                appendToTerminal("$ " + command + "\n", Color.CYAN);
+                appendToTerminal("Command executed: " + command + "\n", Color.WHITE);
+                commandField.setText("");
+            }
+        });
 
         // Add everything to command panel
         commandPanel.add(promptLabel, BorderLayout.WEST);
@@ -133,6 +157,97 @@ public class NodeJSIDE extends JFrame {
 
             // Scroll to bottom
             terminalArea.setCaretPosition(terminalDoc.getLength());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    // Create the menu bar
+    private void createMenuBar() {
+        JMenuBar menuBar = new JMenuBar();
+
+        // File menu
+        JMenu fileMenu = new JMenu("File");
+        JMenuItem newFileItem = new JMenuItem("New File");
+        JMenuItem newFolderItem = new JMenuItem("New Folder");
+        JMenuItem openDirItem = new JMenuItem("Open Directory");
+        JMenuItem saveItem = new JMenuItem("Save");
+        JMenuItem exitItem = new JMenuItem("Exit");
+
+        // Adding action listeners
+        newFileItem.addActionListener(e -> {
+            appendToTerminal("New File menu clicked\n", Color.YELLOW);
+
+        });
+        newFolderItem.addActionListener(e -> {
+            appendToTerminal("New Folder menu clicked\n", Color.YELLOW);
+        });
+
+        openDirItem.addActionListener(e -> {
+            appendToTerminal("Open Directory menu clicked\n", Color.YELLOW);
+        });
+
+        saveItem.addActionListener(e -> {
+            appendToTerminal("Save menu clicked\n", Color.YELLOW);
+        });
+
+        exitItem.addActionListener(e -> System.exit(0));
+        // Add items to file menu
+        fileMenu.add(newFileItem);
+        fileMenu.add(newFolderItem);
+        fileMenu.addSeparator(); // Adds a separator line
+        fileMenu.add(openDirItem);
+        fileMenu.add(saveItem);
+        fileMenu.addSeparator();
+        fileMenu.add(exitItem);
+        // Edit Menu
+        JMenu editMenu = new JMenu("Edit");
+        JMenuItem deleteItem = new JMenuItem("Delete");
+        JMenuItem renameItem = new JMenuItem("Rename");
+        JMenuItem refreshItem = new JMenuItem("Refresh Explorer");
+
+        deleteItem.addActionListener(e -> {
+            appendToTerminal("Delete menu clicked\n", Color.YELLOW);
+        });
+
+        renameItem.addActionListener(e -> {
+            appendToTerminal("Rename menu clicked\n", Color.YELLOW);
+        });
+
+        refreshItem.addActionListener(e -> refreshFileTree());
+
+        editMenu.add(deleteItem);
+        editMenu.add(renameItem);
+        editMenu.addSeparator();
+        editMenu.add(refreshItem);
+
+        // Terminal Menu
+        JMenu terminalMenu = new JMenu("Terminal");
+        JMenuItem clearTerminalItem = new JMenuItem("Clear Terminal");
+        JMenuItem runFileItem = new JMenuItem("Run Current File");
+
+        clearTerminalItem.addActionListener(e -> clearTerminal());
+        runFileItem.addActionListener(e -> {
+            appendToTerminal("Run Current File menu clicked\n", Color.YELLOW);
+        });
+
+        terminalMenu.add(clearTerminalItem);
+        terminalMenu.add(runFileItem);
+
+        // Add all menus to menu bar
+        menuBar.add(fileMenu);
+        menuBar.add(editMenu);
+        menuBar.add(terminalMenu);
+
+        // Set the menu bar for our window
+        setJMenuBar(menuBar);
+    }
+
+    // Method to clear the terminal
+    private void clearTerminal() {
+        try {
+            terminalDoc.remove(0, terminalDoc.getLength());
+            appendToTerminal("Terminal cleared\n", Color.GREEN);
         } catch (Exception e) {
             e.printStackTrace();
         }
