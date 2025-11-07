@@ -7,10 +7,12 @@ import java.io.*; //Provides input and output (I/O) classes for reading and writ
 import java.nio.file.*; //New I/O (NIO) API for modern file handling — introduced in Java 7
 import java.util.*;
 
+
 public class NodeJSIDE extends JFrame {
     private JTree fileTree; // Displays Data in a hierarchical tree structure
     private DefaultTreeModel treeModel; // Data model that holds and manages the strucutre of your JTree
     private DefaultMutableTreeNode rootNode; // Represents Single Node in a JTree.
+
 
     private File workingDirectory;
     private JTabbedPane editorTabs;
@@ -20,17 +22,21 @@ public class NodeJSIDE extends JFrame {
     private JPanel centerPanel;
     private JPanel rightPanel;
 
+
     // Command Panel, Terminal
     private JTextPane terminalArea;
     private JTextField commandField;
     private StyledDocument terminalDoc;
 
+
     // Track opened files
     private Map<String, EditorTab> openFiles;
+
 
     // Process management and terminal styles
     private Process currentProcess;
     private SimpleAttributeSet normalStyle, errorStyle, successStyle, commandStyle;
+
 
     // Constructor - this runs when we create the window
     public NodeJSIDE() {
@@ -39,23 +45,29 @@ public class NodeJSIDE extends JFrame {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE); // Close button stops program
         setLocationRelativeTo(null); // Center the window on screen
 
-        // Set working directory
+
+        // Set working directory to user home initially
         workingDirectory = new File(System.getProperty("user.home"));
+
 
         // Initialize open files map
         openFiles = new HashMap<>();
 
+
         // Initialize terminal styles
         initTerminalStyles();
 
+
         // Initialize Components
         initComponents();
+
 
         // Create Menu bar
         createMenuBar();
         // Make the window visible
         setVisible(true);
     }
+
 
     // Initialize terminal text styles for colored output
     private void initTerminalStyles() {
@@ -75,8 +87,10 @@ public class NodeJSIDE extends JFrame {
         StyleConstants.setBold(commandStyle, true);
     }
 
+
     private void initComponents() {
         mainPanel = new JPanel(new BorderLayout()); // Create a main panel with border layout
+
 
         // Create three panels for our three main areas
         leftPanel = new JPanel();
@@ -102,13 +116,16 @@ public class NodeJSIDE extends JFrame {
         // Add everything to main panel
         mainPanel.add(verticalSplit, BorderLayout.CENTER);
 
+
         // Add main panel to window
         add(mainPanel);
     }
 
+
     // Setup the terminal with command execution capabilities
     private void setupTerminal() {
         rightPanel.setLayout(new BorderLayout());
+
 
         // Creating terminal area(For output)
         terminalArea = new JTextPane();
@@ -118,8 +135,10 @@ public class NodeJSIDE extends JFrame {
         terminalArea.setForeground(Color.WHITE); // White text
         terminalArea.setCaretColor(Color.WHITE); // White cursor
 
+
         // Get the document for styling text
         terminalDoc = terminalArea.getStyledDocument();
+
 
         // Put terminal in scroll pane
         JScrollPane terminalScroll = new JScrollPane(terminalArea);
@@ -129,17 +148,20 @@ public class NodeJSIDE extends JFrame {
         JLabel promptLabel = new JLabel("$");
         promptLabel.setForeground(Color.GREEN);
 
+
         commandField = new JTextField();
         commandField.setFont(new Font("Consolas", Font.PLAIN, 13));
         commandField.setBackground(new Color(30, 30, 30));
         commandField.setForeground(Color.WHITE);
         commandField.setCaretColor(Color.WHITE);
 
+
         // Add buttons
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
         JButton executeBtn = new JButton("Execute");
         JButton clearBtn = new JButton("Clear");
         JButton stopBtn = new JButton("Stop Process");
+
 
         // Execute button action - runs commands in terminal
         executeBtn.addActionListener(e -> executeCommand());
@@ -148,21 +170,26 @@ public class NodeJSIDE extends JFrame {
         // Stop button - stops currently running process
         stopBtn.addActionListener(e -> stopProcess());
 
+
         buttonPanel.add(executeBtn);
         buttonPanel.add(clearBtn);
         buttonPanel.add(stopBtn);
 
+
         // For Enter Key - allows executing commands by pressing Enter
         commandField.addActionListener(e -> executeCommand());
+
 
         // Add everything to command panel
         commandPanel.add(promptLabel, BorderLayout.WEST);
         commandPanel.add(commandField, BorderLayout.CENTER);
         commandPanel.add(buttonPanel, BorderLayout.EAST);
 
+
         // Quick command buttons for common Node.js commands
         JPanel quickCommandPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
         String[] quickCommands = {"node --version", "npm --version", "npm init -y", "npm install"};
+
 
         for (String cmd : quickCommands) {
             JButton quickBtn = new JButton(cmd);
@@ -170,21 +197,25 @@ public class NodeJSIDE extends JFrame {
             quickCommandPanel.add(quickBtn);
         }
 
+
         // Create top panel for terminal title and quick commands
         JPanel terminalTopPanel = new JPanel(new BorderLayout());
         terminalTopPanel.add(new JLabel("Terminal"), BorderLayout.WEST);
         terminalTopPanel.add(quickCommandPanel, BorderLayout.CENTER);
+
 
         // Add welcome message to terminal
         appendToTerminal("=== Node.js Terminal ===\n", successStyle);
         appendToTerminal("Working directory: " + workingDirectory.getAbsolutePath() + "\n", normalStyle);
         appendToTerminal("Type Node.js commands below or use quick buttons\n\n", normalStyle);
 
+
         // Add everything to right panel
         rightPanel.add(terminalTopPanel, BorderLayout.NORTH);
         rightPanel.add(terminalScroll, BorderLayout.CENTER);
         rightPanel.add(commandPanel, BorderLayout.SOUTH);
     }
+
 
     // Helper method to add styled text to terminal
     private void appendToTerminal(String text, SimpleAttributeSet style) {
@@ -196,12 +227,14 @@ public class NodeJSIDE extends JFrame {
         }
     }
 
+
     // Overloaded method for backward compatibility with color parameter
     private void appendToTerminal(String text, Color color) {
         SimpleAttributeSet style = new SimpleAttributeSet();
         StyleConstants.setForeground(style, color);
         appendToTerminal(text, style);
     }
+
 
     // Execute command from terminal input
     private void executeCommand() {
@@ -260,11 +293,13 @@ public class NodeJSIDE extends JFrame {
         }).start();
     }
 
+
     // Execute quick commands from buttons
     private void executeQuickCommand(String command) {
         commandField.setText(command);
         executeCommand();
     }
+
 
     // Stop currently running process
     private void stopProcess() {
@@ -276,9 +311,11 @@ public class NodeJSIDE extends JFrame {
         }
     }
 
+
     // Create the menu bar with File, Edit, and Terminal menus
     private void createMenuBar() {
         JMenuBar menuBar = new JMenuBar();
+
 
         // File menu - contains file operations
         JMenu fileMenu = new JMenu("File");
@@ -288,12 +325,14 @@ public class NodeJSIDE extends JFrame {
         JMenuItem saveItem = new JMenuItem("Save");
         JMenuItem exitItem = new JMenuItem("Exit");
 
+
         // Adding action listeners for file operations
         newFileItem.addActionListener(e -> createNewFile());
         newFolderItem.addActionListener(e -> createNewFolder());
         openDirItem.addActionListener(e -> changeWorkingDirectory());
         saveItem.addActionListener(e -> saveCurrentFile());
         exitItem.addActionListener(e -> System.exit(0));
+
 
         // Add items to file menu
         fileMenu.add(newFileItem);
@@ -304,41 +343,50 @@ public class NodeJSIDE extends JFrame {
         fileMenu.addSeparator();
         fileMenu.add(exitItem);
 
+
         // Edit Menu - contains editing operations
         JMenu editMenu = new JMenu("Edit");
         JMenuItem deleteItem = new JMenuItem("Delete");
         JMenuItem renameItem = new JMenuItem("Rename");
         JMenuItem refreshItem = new JMenuItem("Refresh Explorer");
 
+
         // Edit menu actions
         deleteItem.addActionListener(e -> deleteSelectedFile());
         renameItem.addActionListener(e -> renameSelectedFile());
         refreshItem.addActionListener(e -> refreshFileTree());
+
 
         editMenu.add(deleteItem);
         editMenu.add(renameItem);
         editMenu.addSeparator();
         editMenu.add(refreshItem);
 
+
         // Terminal Menu - contains terminal operations
         JMenu terminalMenu = new JMenu("Terminal");
         JMenuItem clearTerminalItem = new JMenuItem("Clear Terminal");
         JMenuItem runFileItem = new JMenuItem("Run Current File");
 
+
         clearTerminalItem.addActionListener(e -> clearTerminal());
         runFileItem.addActionListener(e -> runCurrentFile());
 
+
         terminalMenu.add(clearTerminalItem);
         terminalMenu.add(runFileItem);
+
 
         // Add all menus to menu bar
         menuBar.add(fileMenu);
         menuBar.add(editMenu);
         menuBar.add(terminalMenu);
 
+
         // Set the menu bar for our window
         setJMenuBar(menuBar);
     }
+
 
     // Method to clear the terminal output
     private void clearTerminal() {
@@ -350,18 +398,28 @@ public class NodeJSIDE extends JFrame {
         }
     }
 
-    // Change working directory
+
+    // Change working directory - this is the key fix for your issue
     private void changeWorkingDirectory() {
         JFileChooser chooser = new JFileChooser(workingDirectory);
         chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
         chooser.setDialogTitle("Select Working Directory");
         
         if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+            // Update working directory
             workingDirectory = chooser.getSelectedFile();
+            
+            // Completely rebuild the tree with the new directory as the absolute root
+            rootNode.removeAllChildren();
+            rootNode.setUserObject(new FileNode(workingDirectory.getName(), workingDirectory, true));
+            
+            // Reload the tree
             refreshFileTree();
+            
             appendToTerminal("\n[Working directory changed to: " + workingDirectory.getAbsolutePath() + "]\n\n", successStyle);
         }
     }
+
 
     // Create new folder
     private void createNewFolder() {
@@ -376,6 +434,7 @@ public class NodeJSIDE extends JFrame {
             }
         }
     }
+
 
     // Rename selected file
     private void renameSelectedFile() {
@@ -405,21 +464,26 @@ public class NodeJSIDE extends JFrame {
         }
     }
 
+
     // Setup file explorer with tree view and buttons - shows only filenames
     private void setupFileExplorer() {
         // Remove the previous simple setup
         leftPanel.setLayout(new BorderLayout());
 
-        // Create the root node for our file tree
+
+        // Create the root node for our file tree - starts with working directory name only
         rootNode = new DefaultMutableTreeNode(new FileNode(workingDirectory.getName(), workingDirectory, true));
+
 
         // Create tree model to manage the tree structure
         treeModel = new DefaultTreeModel(rootNode);
+
 
         // Create the actual tree components
         fileTree = new JTree(treeModel);
         fileTree.setRootVisible(true);
         fileTree.setShowsRootHandles(true);
+
 
         // Custom tree cell renderer to show only filenames
         fileTree.setCellRenderer(new DefaultTreeCellRenderer() {
@@ -447,6 +511,7 @@ public class NodeJSIDE extends JFrame {
             }
         });
 
+
         // Double Click to open files - main file interaction
         fileTree.addMouseListener(new MouseAdapter() {
             public void mouseClicked(MouseEvent e) {
@@ -466,29 +531,36 @@ public class NodeJSIDE extends JFrame {
             }
         });
 
+
         // Put the tree in a scroll pane for large directories
         JScrollPane scrollPane = new JScrollPane(fileTree);
+
 
         // Buttons at the top for common operations
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         JButton refreshBtn = new JButton("Refresh");
         JButton newFileBtn = new JButton("New File");
 
+
         // Event for refresh button - reloads file tree
         refreshBtn.addActionListener(e -> refreshFileTree());
         // Event for new file button - creates new files
         newFileBtn.addActionListener(e -> createNewFile());
 
+
         buttonPanel.add(refreshBtn);
         buttonPanel.add(newFileBtn);
+
 
         // Add everything to left panel
         leftPanel.add(buttonPanel, BorderLayout.NORTH);
         leftPanel.add(scrollPane, BorderLayout.CENTER);
 
+
         // Load the actual files from disk
         refreshFileTree();
     }
+
 
     // Setup the editor area with tabs for multiple file editing
     private void setupEditor() {
@@ -499,26 +571,32 @@ public class NodeJSIDE extends JFrame {
         JButton saveBtn = new JButton("Save");
         JButton closeBtn = new JButton("Close Tab");
 
+
         // Action Listeners for editor buttons
         runBtn.addActionListener(e -> runCurrentFile());
         saveBtn.addActionListener(e -> saveCurrentFile());
         closeBtn.addActionListener(e -> closeCurrentTab());
 
+
         toolbar.add(runBtn);
         toolbar.add(saveBtn);
         toolbar.add(closeBtn);
+
 
         // Create the tabbed pane for multiple files
         editorTabs = new JTabbedPane();
         editorTabs.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT); // Scroll tabs if too many
 
+
         // Add a welcome tab with instructions
         addWelcomeTab();
+
 
         // Add everything to center panel
         centerPanel.add(toolbar, BorderLayout.NORTH);
         centerPanel.add(editorTabs, BorderLayout.CENTER);
     }
+
 
     // Run current JavaScript file with Node.js
     private void runCurrentFile() {
@@ -540,6 +618,7 @@ public class NodeJSIDE extends JFrame {
         }
     }
 
+
     // Add welcome tab with user instructions
     private void addWelcomeTab() {
         JTextArea welcomeEditor = new JTextArea();
@@ -551,27 +630,34 @@ public class NodeJSIDE extends JFrame {
                 "• Stop running processes with Stop Process button\n" +
                 "• Change working directory from File menu\n" +
                 "• Create new files and folders with File menu\n" +
-                "• Save files with Save button or Ctrl+S");
+                "• Save files with Save button or Ctrl+S\n" +
+                "• Refresh file tree to see external changes");
         welcomeEditor.setFont(new Font("Consolas", Font.PLAIN, 14));
         welcomeEditor.setEditable(false);
         welcomeEditor.setBackground(new Color(30, 30, 30));
         welcomeEditor.setForeground(new Color(200, 200, 200));
 
+
         JScrollPane scrollPane = new JScrollPane(welcomeEditor);
         editorTabs.addTab("Welcome", scrollPane);
     }
 
-    // Refresh file tree - reloads directory structure
+
+    // Refresh file tree - reloads directory structure from the working directory only
     private void refreshFileTree() {
-        // Clear existing nodes
+        // Clear existing child nodes (but keep the root as is)
         rootNode.removeAllChildren();
 
-        // set the root name to current directory
+
+        // Ensure root represents the current working directory
         rootNode.setUserObject(new FileNode(workingDirectory.getName(), workingDirectory, true));
 
-        // Load files in background thread so GUI appears immediately
+
+        // Load files in background thread so GUI stays responsive
         new Thread(() -> {
+            // Load only the contents of the working directory, not parent directories
             loadDirectory(workingDirectory, rootNode);
+
 
             // Update the tree on the GUI thread
             SwingUtilities.invokeLater(() -> {
@@ -581,12 +667,21 @@ public class NodeJSIDE extends JFrame {
         }).start();
     }
 
-    // Recursively load directory contents into tree nodes
+
+    // Recursively load directory contents into tree nodes - only subdirectories of working directory
     private void loadDirectory(File dir, DefaultMutableTreeNode node) {
         File[] files = dir.listFiles();
         if (files != null) {
+            // Sort files for better organization - directories first, then files alphabetically
+            Arrays.sort(files, (f1, f2) -> {
+                if (f1.isDirectory() && !f2.isDirectory()) return -1;
+                if (!f1.isDirectory() && f2.isDirectory()) return 1;
+                return f1.getName().compareToIgnoreCase(f2.getName());
+            });
+            
             for (File file : files) {
                 // Only show normal files (not hidden ones that start with dot)
+                // Also skip node_modules for cleaner view
                 if (!file.getName().startsWith(".") && !file.getName().equals("node_modules")) {
                     // Create node for this file/folder using FileNode wrapper
                     FileNode fileNode = new FileNode(file.getName(), file, file.isDirectory());
@@ -600,6 +695,7 @@ public class NodeJSIDE extends JFrame {
             }
         }
     }
+
 
     // Open a file in the editor - creates new tab with file content
     private void openFile(File file) {
@@ -617,6 +713,7 @@ public class NodeJSIDE extends JFrame {
             // Read the file content from disk
             String content = Files.readString(file.toPath());
 
+
             // Create a text area for editing with code-friendly settings
             JTextArea editor = new JTextArea(content);
             editor.setFont(new Font("Consolas", Font.PLAIN, 14));
@@ -625,16 +722,20 @@ public class NodeJSIDE extends JFrame {
             editor.setForeground(new Color(200, 200, 200)); // Light text
             editor.setCaretColor(Color.WHITE); // Visible cursor
 
+
             // Put editor in scroll pane for large files
             JScrollPane scrollPane = new JScrollPane(editor);
+
 
             // Create and store the tab information
             EditorTab tab = new EditorTab(file, editor, scrollPane);
             openFiles.put(filePath, tab);
 
+
             // Add tab for this file and switch to it
             editorTabs.addTab(file.getName(), scrollPane);
             editorTabs.setSelectedComponent(scrollPane);
+
 
             // Show success message in terminal
             appendToTerminal("[Opened: " + file.getName() + "]\n", successStyle);
@@ -643,6 +744,7 @@ public class NodeJSIDE extends JFrame {
             appendToTerminal("[Error opening file: " + e.getMessage() + "]\n", errorStyle);
         }
     }
+
 
     // Create a new file with user-specified name
     private void createNewFile() {
@@ -663,6 +765,7 @@ public class NodeJSIDE extends JFrame {
         }
     }
 
+
     // Save the currently active file
     private void saveCurrentFile() {
         int index = editorTabs.getSelectedIndex();
@@ -682,6 +785,7 @@ public class NodeJSIDE extends JFrame {
         }
     }
 
+
     // Save file content to disk
     private void saveFile(EditorTab tab) {
         try {
@@ -691,6 +795,7 @@ public class NodeJSIDE extends JFrame {
             appendToTerminal("[Error saving: " + e.getMessage() + "]\n", errorStyle);
         }
     }
+
 
     // Delete selected file from file explorer
     private void deleteSelectedFile() {
@@ -726,6 +831,7 @@ public class NodeJSIDE extends JFrame {
         }
     }
 
+
     // Close current editor tab
     private void closeCurrentTab() {
         int selectedIndex = editorTabs.getSelectedIndex();
@@ -745,6 +851,7 @@ public class NodeJSIDE extends JFrame {
             appendToTerminal("[Closed tab: " + tabTitle + "]\n", Color.YELLOW);
         }
     }
+
 
     // Helper class to store file information while displaying only the name
     class FileNode {
@@ -776,6 +883,7 @@ public class NodeJSIDE extends JFrame {
         }
     }
 
+
     // Helper class to track editor tab information
     class EditorTab {
         File file;
@@ -788,6 +896,7 @@ public class NodeJSIDE extends JFrame {
             this.scrollPane = scrollPane;
         }
     }
+
 
     // Main method - program entry point
     public static void main(String[] args) {
